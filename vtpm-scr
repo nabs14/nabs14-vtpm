@@ -1,0 +1,90 @@
+#!/bin/bash
+
+#check and remove existing files and domains
+cd /var/xen/
+if [ -e /var/xen/vtpmmgr.cfg ]; then
+  rm /var/xen/vtpmmgr.cfg
+  else echo "no vtpmmgr.cfg found.. OK"
+fi
+
+if [ -e /var/xen/vtpm.cfg ]; then
+  rm /var/xen/vtpm.cfg
+  else echo "no vtpm.cfg found.. OK"
+fi
+
+if [ -e /var/xen/vtpmmgr.img ]; then
+  rm /var/xen/vtpmmgr.img
+  else echo "no vtpmmgr.cfg found.. OK"
+fi
+
+if [ -e /var/xen/vtpm.img ]; then
+  rm /var/xen/vtpm.img
+  else echo "no vtpmmgr.cfg found.. OK"
+fi
+
+ls -la | grep vtpm
+
+cd /usr/local/sbin/
+xl destroy vtpmmgr
+xl destory vtpm
+xl list
+sleep 2
+
+#start provision for vtpmmgr
+
+config1="vtpmmgr.cfg"
+config2="vtpm.cfg"
+
+cd /var/xen/
+dd if=/dev/zero of=/var/xen/vtpmmgr.img bs=16M count=1
+
+if [ -f /var/xen/vtpmmgr.img ]; then
+  echo "kernel=\"/usr/local/lib/xen/boot/vtpmmgr-stubdom.gz\"" >> $config1
+  echo "memory=16" >> $config1
+  echo "disk=[\"file:/var/xen/vtpmmgr.img,hda,w\"]" >> $config1
+  echo "name=\"vtpmmgr\"" >> $config1
+  echo "iomem=[\"fed40,5\"]" >> $config1
+fi
+
+echo "Generating config file for vtpmmgr.."
+echo "---------------------------------------"
+cat /var/xen/vtpmmgr.cfg
+echo "---------------------------------------"
+
+if [ -f /var/xen/vtpmmgr.cfg ]; then 
+  cd /usr/local/sbin
+  xl create /var/xen/vtpmmgr.cfg
+fi
+
+#wait for vtpmmgr to load
+sleep 10
+
+#start provision for vtpm
+cd /var/xen
+dd if=/dev/zero of=/var/xen/vtpm.img bs=8M count=1
+
+uuid=$(uuidgen)
+echo "uuid $uuid generated for vtpm..."
+
+if [ -f /var/xen/vtpm.img ]; then
+  echo "kernel=\"/usr/local/lib/xen/boot/vtpm-stubdom.gz\"" >> $config2
+  echo "memory=16" >> $config2
+  echo "disk=[\"file:/var/xen/vtpm.img,hda,w\"]" >> $config2
+  echo "name=\"vtpm\"" >> $config2
+  echo "vtpm=[\"backend=vtpmmgr,uuid=$uuid\"]" >> $config2
+fi
+
+echo "Generating config file for vtpm.."
+echo "---------------------------------------"
+cat /var/xen/vtpm.cfg
+echo "---------------------------------------"
+
+if [ -f /var/xen/vtpm.cfg ]; then
+  cd /usr/local/sbin
+  xl create /var/xen/vtpm.cfg
+fi
+
+#wait for vtpm to load
+sleep 10
+
+xl list
