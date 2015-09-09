@@ -1,0 +1,245 @@
+#!/bin/bash
+
+#### VTPM PROVISIONING ####
+
+# start with creating vtpm for the vm
+echo -n "Enter [name]_[img]_[cfg] file name for vtpm: "
+read vtpm_name vtpm_img vtpm_cfg
+
+echo -n "Enter [name]_[img]_[cfg] file name for vm: "
+read vm_name vm_img vm_cfg
+
+echo "Checking if $vtpm_name stubdom exists.."
+sleep 2
+
+cd /usr/local/sbin/
+if xl list | grep $vtpm_name; then
+  echo "$vtpm_name exist! Do you want to destroy it? [Y/N]: "
+  read resp1
+  if [ $resp1 = "Y" ]; then
+    cd /usr/local/sbin
+    xl destroy $vtpm_name
+    xl list
+    sleep 2
+  elif [ $resp1 = "N" ]; then
+    cd /usr/local/sbin
+    echo "$vtpm_name will not be destroyed."
+    exit
+  else
+    echo "Please enter \"Y\" or \"N\"!!"
+    exit
+  fi
+  else echo "domu_chk OK!"
+  sleep 1
+fi
+
+echo "Checking if $vtpm_img image file exists.."
+sleep 2
+
+cd /var/xen/
+if [ -e /var/xen/$vtpm_img ]; then
+  echo "$vtpm_img exist! Do you want to destroy it? [Y/N]: "
+  read resp2
+  if [ $resp2 = "Y" ]; then
+    rm /var/xen/$vtpm_img
+  elif [ $resp2 = "N" ]; then
+    echo "$vtpm_img will not be destroyed."
+    exit
+  else
+    echo "Please enter \"Y\" or \"N\"!!"
+    exit
+  fi
+  else echo "img_chk OK!"
+  sleep 1
+fi
+
+echo "Checking if $vtpm_cfg cfg file exists.."
+sleep 2
+
+cd /var/xen/
+if [ -e /var/xen/$vtpm_cfg ]; then
+  echo "$vtpm_cfg exist! Do you want to destroy it? [Y/N]: "
+  read resp3
+  if [ $resp3 = "Y" ]; then
+    rm /var/xen/$vtpm_cfg
+  elif [ $resp3 = "N" ]; then
+    echo "$vtpm_cfg will not be destroyed."
+    exit
+  else
+    echo "Please enter \"Y\" or \"N\"!!"
+    exit
+  fi
+  else echo "cfg_chk OK!"
+  sleep 1
+fi
+
+# start provision for vtpm
+echo "Starting provisioning for $vtpm_name .."
+sleep 2
+
+cd /var/xen
+dd if=/dev/zero of=/var/xen/$vtpm_img bs=8M count=1
+
+uuid=$(uuidgen)
+echo "uuid $uuid generated for vtpm..."
+sleep 2
+
+if [ -f /var/xen/vtpm.img ]; then
+  echo "kernel=\"/usr/local/lib/xen/boot/vtpm-stubdom.gz\"" >> $vtpm_cfg
+  echo "memory=16" >> $vtpm_cfg
+  echo "disk=[\"file:/var/xen/$vtpm_img,hda,w\"]" >> $vtpm_cfg
+  echo "name=\"$vtpm_name\"" >> $vtpm_cfg
+  echo "vtpm=[\"backend=vtpmmgr,uuid=$uuid\"]" >> $vtpm_cfg
+fi
+
+echo "Generating config file for $vtpm_name.."
+echo "---------------------------------------"
+cat /var/xen/$vtpm_cfg
+echo "---------------------------------------"
+sleep 2
+
+if [ -f /var/xen/$vtpm_cfg ]; then
+  cd /usr/local/sbin
+  xl create /var/xen/$vtpm_cfg
+fi
+
+#wait for vtpm to load
+echo "Waiting for $vtpm_name to load.."
+sleep 10
+
+cd /usr/local/sbin
+xl list
+sleep 3
+echo "Continuing to domu provisioning.."
+sleep 2
+
+#### DOMU PROVISIONING ####
+
+# start with checking existing vm
+#echo -n "Enter name, cfg file and img for vm: "
+#read vm_name vm_img vm_cfg
+
+echo "Checking if $vm_name domu already exists.."
+sleep 2
+
+cd /usr/local/sbin/
+if xl list | grep $vm_name; then
+  echo "$vm_name exist! Do you want to destroy it? [Y/N]: "
+  read resp_a
+  if [ $resp_a = "Y" ]; then
+    cd /usr/local/sbin
+    xl destroy $vm_name
+    xl list
+    sleep 2
+  elif [ $resp_a = "N" ]; then
+    cd /usr/local/sbin
+    echo "$vm_name will not be destroyed."
+    exit
+  else
+    echo "Please enter \"Y\" or \"N\"!!"
+    exit
+  fi
+  else echo "domu_chk OK!"
+  sleep 1
+fi
+
+echo "Checking if $vm_img image file exists.."
+sleep 2
+
+cd /var/xen/
+if [ -e /var/xen/$vm_img ]; then
+  echo "$vm_img exist! Do you want to destroy it? [Y/N]: "
+  read resp_b
+  if [ $resp_b = "Y" ]; then
+    rm /var/xen/$vm_img
+  elif [ $resp_b = "N" ]; then
+    echo "$vm_img will not be destroyed."
+    exit
+  else
+    echo "Please enter \"Y\" or \"N\"!!"
+    exit
+  fi
+  else echo "img_chk OK!"
+  sleep 1
+fi
+
+echo "Checking if $vm_cfg cfg file exists.."
+sleep 2
+
+cd /var/xen/
+if [ -e /var/xen/$vm_cfg ]; then
+  echo "$vm_cfg exist! Do you want to destroy it? [Y/N]: "
+  read resp_c
+  if [ $resp_c = "Y" ]; then
+    rm /var/xen/$vm_cfg
+  elif [ $resp_c = "N" ]; then
+    echo "$vm_cfg will not be destroyed."
+    exit
+  else
+    echo "Please enter \"Y\" or \"N\"!!"
+    exit
+  fi
+  else echo "cfg_chk OK!"
+  sleep 1
+fi
+
+# start provision for vm
+echo "Starting provisioning for $vm_name.."
+sleep 2
+
+# Provisioning disk image
+cd /var/xen/
+if [ -f /var/xen/Debian8_vtpm.img ]; then
+  echo "Creating disk image $vm_img for $vm_name.."
+  echo "This may take a while.."
+  cp /var/xen/Debian8_vtpm.img /var/xen/$vm_img
+#  echo "Return status: $?"
+
+  if [ $? = 0 ]; then
+    echo "Disk image $vm_img created!"
+    else echo "Error creating disk image!"
+      exit
+  fi
+else echo "No base image found!"
+  exit
+fi
+
+#start creating cfg files
+echo "Creating cfg file $vm_cfg for $vm_name.."
+sleep 2
+
+if [ -f /var/xen/$vm_img ]; then
+  echo "kernel='/var/xen/vtpm-vmlinuz'" >> $vm_cfg
+  echo "ramdisk='/var/xen/vtpm-initrd.img'" >> $vm_cfg
+  echo "vcpus='1'" >> $vm_cfg
+  echo "memory='1024'" >> $vm_cfg
+  echo "root='/dev/xvda1 ro'" >> $vm_cfg
+  echo "disk=['tap:aio:/var/xen/$vm_img,xvda1,w']" >> $vm_cfg
+  echo "name='$vm_name'" >> $vm_cfg
+  echo "vif=[ '','bridge=xenbr1-419']" >> $vm_cfg
+  echo "on_poweroff='destroy'" >> $vm_cfg
+  echo "on_reboot='restart'" >> $vm_cfg
+  echo "on_crash='restart'" >> $vm_cfg
+  echo "extra='console=hvc0 xencons=tty'" >> $vm_cfg
+  echo "vtpm=[\"backend=$vtpm_name\"]" $vm_cfg
+fi
+
+echo "$vm_cfg created for $vm_name with vtpm $vtpm_name .."
+echo "-------------------------------------------"
+cd /var/xen/
+cat /var/xen/$vm_cfg
+echo "-------------------------------------------"
+sleep 2
+
+# start xl create vm
+if [ -f /var/xen/vtpmmgr.cfg ]; then
+  cd /usr/local/sbin
+  xl create /var/xen/$vm_cfg
+fi
+
+echo "Creating $vm_name.."
+sleep 2
+cd /usr/local/sbin/
+xl list
+#sleep 3
+#xl console $vm_name
