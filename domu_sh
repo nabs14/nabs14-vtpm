@@ -1,0 +1,92 @@
+#!/bin/bash
+
+# check first if vm exists
+echo -n "Enter name for VM: "
+read vm_name
+
+echo "Checking if vm already exists.."
+sleep 2
+
+cd /usr/local/sbin/
+if xl list | grep $vm_name; then
+  echo "$vm_name exist! Do you want to destroy it? [Y/N]: "
+  read resp
+  if [ $resp = "Y" ]; then
+    cd /usr/local/sbin
+    xl destroy $vm_name
+    xl list
+    sleep 2
+  elif [ $resp = "N" ]; then
+    cd /usr/local/sbin
+    echo "$vm_name will not be destroyed."
+    exit
+  else
+    echo "Please enter \"Y\" or \"N\"!!"
+    exit
+  fi
+  else echo "OK!"
+  sleep 1
+fi
+
+# start provision for vm
+echo "Starting provisioning for $vm_name.."
+sleep 2
+
+# Provisioning disk image
+cd /var/xen/
+if [ -f /var/xen/Debian8_vtpm.img ]; then
+  echo -n "Enter name for disk image: "
+  read vm_img
+  echo "Creating disk image $vm_img for $vm_name.."
+  echo "This may take a while.."
+  cp /var/xen/Debian8_vtpm.img /var/xen/$vm_img
+#  echo "Return status: $?"
+
+  if [ $? = 0 ]; then
+    echo "Disk image $vm_img created!"
+    else echo "Error creating disk image!"
+      exit
+  fi
+else echo "No base image found!"
+  exit
+fi
+
+#start creating cfg files
+echo "Enter name for cfg file: "
+read vm_cfg
+echo "Creating cfg file $vm_cfg for $vm_name.."
+sleep 2
+
+if [ -f /var/xen/$vm_img ]; then
+  echo "kernel='/var/xen/vtpm-vmlinuz'" >> $vm_cfg
+  echo "ramdisk='/var/xen/vtpm-initrd.img'" >> $vm_cfg
+  echo "vcpus='1'" >> $vm_cfg
+  echo "memory='1024'" >> $vm_cfg
+  echo "root='/dev/xvda1 ro'" >> $vm_cfg
+  echo "disk=['tap:aio:/var/xen/$vm_img,xvda1,w']" >> $vm_cfg
+  echo "name='$vm_name'" >> $vm_cfg
+  echo "vif=[ '','bridge=xenbr1-419']" >> $vm_cfg
+  echo "on_poweroff='destroy'" >> $vm_cfg
+  echo "on_reboot='restart'" >> $vm_cfg
+  echo "on_crash='restart'" >> $vm_cfg
+  echo "extra='console=hvc0 xencons=tty'" >> $vm_cfg
+#  echo "vtpm=[\"backend=domu-vtpm\"]" $vm_cfg
+fi
+
+echo "$vm_cfg created for $vm_name.."
+echo "-------------------------------------------"
+cd /var/xen/
+cat /var/xen/$vm_cfg
+echo "-------------------------------------------"
+sleep 2
+
+# start xl create vm
+if [ -f /var/xen/vtpmmgr.cfg ]; then
+  cd /usr/local/sbin
+  xl create /var/xen/$vm_cfg
+fi
+
+echo "Creating $vm_name.."
+sleep 2
+cd /usr/local/sbin/
+xl list
