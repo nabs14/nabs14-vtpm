@@ -1,3 +1,38 @@
+#!/bin/bash
+
+SCR_DIR="/var/scr/"
+SSH_USER="root"
+VTPM_VM="192.168.0.161"
+
+cd $SCR_DIR
+
+# Premigration Check
+INIT_PREMIG="export CLASSPATH=/etc/tpm/tpmj/lib/tpmj.jar:/etc/tpm/tpmj/lib/bcprov-jdk15-131.jar; cd /etc/tripwire; . premig-trip.sh"
+# . premig-trip.sh
+
+# Migration occurs
+#INIT_MIG="cd $SCR_DIR; . mig.sh"
+# . mig.sh
+
+# Postmigration Check
+INIT_POSTMIG="export CLASSPATH=/etc/tpm/tpmj/lib/tpmj.jar:/etc/tpm/tpmj/lib/bcprov-jdk15-131.jar; cd /etc/tripwire; . postmig-trip.sh"
+#. postmig-trip.sh
+
+# Verification of PCRs
+#INIT_VER="cd $SCR_DIR; . verify.sh"
+# . verify.sh
+
+# Premig
+echo -n "Begin premig phase? [Y/N]: "
+read prem_resp
+if [ $prem_resp = "Y" ]; then
+  echo "Beginning Premig Phase.."; sleep 1
+  echo "Connecting to $VTPM_VM.."; sleep 2
+  ssh -l ${SSH_USER} ${VTPM_VM} "${INIT_PREMIG}"
+  echo "Disconnected from $VTPM_VM.."; sleep 1
+elif [ $prem_resp = "N" ]; then
+  echo "Halt."; echo $?; exit
+else echo "Please enter 'Y' or 'N'"
   echo $?; exit
 fi
 echo "End of Premig Phase.."; sleep 1
