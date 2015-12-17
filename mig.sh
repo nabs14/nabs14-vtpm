@@ -1,8 +1,6 @@
 #!/bin/bash
 
 # Migration
-#echo -n "Enter username for ssh: "
-#read USERNAME
 echo -n "Enter source host: "
 read SRC_HOST
 echo -n "Enter destination host: "
